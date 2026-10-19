@@ -1,17 +1,41 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 
 class PlayerCreate(BaseModel):
     username: str
+    discord_id: str | None = None
+
+
+class ProfileUpdate(BaseModel):
+    rank: str
+    region: str
+
+
+class ProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    game: str
+    rank: str
+    region: str
 
 
 class PlayerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
+    discord_id: str | None
+    profiles: list[ProfileOut] = []
 
-    class Config:
-        from_attributes = True
+
+class ProfileSearchResult(BaseModel):
+    player_id: int
+    username: str
+    discord_id: str | None
+    game: str
+    rank: str
+    region: str
 
 class SessionCreate(BaseModel):
     game: str

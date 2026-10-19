@@ -29,8 +29,12 @@ def create_player(player: schemas.PlayerCreate, db: Session = Depends(get_db)):
     existing = db.query(models.Player).filter(models.Player.username == player.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already registered")
+    if player.discord_id:
+        linked = db.query(models.Player).filter(models.Player.discord_id == player.discord_id).first()
+        if linked:
+            raise HTTPException(status_code=400, detail="Discord account already linked to a player")
 
-    new_player = models.Player(username=player.username)
+    new_player = models.Player(username=player.username, discord_id=player.discord_id)
     db.add(new_player)
     db.commit()
     db.refresh(new_player)
@@ -43,6 +47,55 @@ def get_player(player_id: int, db: Session = Depends(get_db)):
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     return player
+
+
+@app.get("/players/by-discord/{discord_id}", response_model=schemas.PlayerOut)
+def get_player_by_discord(discord_id: str, db: Session = Depends(get_db)):
+    player = db.query(models.Player).filter(models.Player.discord_id == discord_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return player
+
+
+@app.put("/players/{player_id}/profiles/{game}", response_model=schemas.ProfileOut)
+def set_profile(player_id: int, game: str, profile: schemas.ProfileUpdate, db: Session = Depends(get_db)):
+    player = db.query(models.Player).filter(models.Player.id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # PUT creates the profile the first time and replaces it after that.
+    existing = db.query(models.GameProfile).filter(
+        models.GameProfile.player_id == player_id,
+        models.GameProfile.game == game,
+    ).first()
+    if existing:
+        existing.rank = profile.rank
+        existing.region = profile.region
+        saved = existing
+    else:
+        saved = models.GameProfile(player_id=player_id, game=game, **profile.model_dump())
+        db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    return saved
+
+
+@app.get("/profiles", response_model=list[schemas.ProfileSearchResult])
+def search_profiles(game: str, region: str | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.GameProfile, models.Player).join(
+        models.Player, models.GameProfile.player_id == models.Player.id
+    ).filter(models.GameProfile.game == game)
+
+    if region:
+        query = query.filter(models.GameProfile.region == region)
+
+    return [
+        schemas.ProfileSearchResult(
+            player_id=player.id, username=player.username, discord_id=player.discord_id,
+            game=profile.game, rank=profile.rank, region=profile.region,
+        )
+        for profile, player in query.all()
+    ]
 
 @app.post("/players/{player_id}/sessions", response_model=schemas.SessionOut)
 def log_session(player_id: int, session: schemas.SessionCreate, db: Session = Depends(get_db)):
