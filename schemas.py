@@ -1,5 +1,7 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlayerCreate(BaseModel):
@@ -39,12 +41,15 @@ class ProfileSearchResult(BaseModel):
 
 class SessionCreate(BaseModel):
     game: str
-    result: str
-    kills: int = 0
-    deaths: int = 0
+    # Only these two values are accepted, so a typo like "Win" is a 422 instead of a silent loss.
+    result: Literal["win", "loss"]
+    kills: int = Field(default=0, ge=0)
+    deaths: int = Field(default=0, ge=0)
 
 
 class SessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     game: str
     result: str
@@ -52,9 +57,6 @@ class SessionOut(BaseModel):
     deaths: int
     played_at: datetime
     player_id: int
-
-class Config:
-        from_attributes = True
 
 class PlayerStats(BaseModel):
     total_games: int

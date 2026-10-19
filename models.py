@@ -12,8 +12,9 @@ class Player(Base):
     # Stored as a string because Discord IDs are 64-bit and JSON clients like JavaScript lose precision on them.
     discord_id = Column(String, unique=True, index=True, nullable=True)
 
-    sessions = relationship("GameSession", back_populates="player")
-    profiles = relationship("GameProfile", back_populates="player")
+    # Deleting a player also deletes their sessions and profiles, instead of leaving rows that point at nobody.
+    sessions = relationship("GameSession", back_populates="player", cascade="all, delete-orphan")
+    profiles = relationship("GameProfile", back_populates="player", cascade="all, delete-orphan")
 
 
 class GameSession(Base):
